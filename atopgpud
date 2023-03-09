@@ -51,6 +51,12 @@ import logging
 import logging.handlers as loghand
 import threading
 
+from argparse import ArgumentParser
+
+argparser = ArgumentParser()
+argparser.add_argument("-D", "--nodaemon", action="store_true")
+args = argparser.parse_args()
+
 GPUDPORT     = 59123		# TCP port number server
 
 COMPUTE      = 1		# task support bit value
@@ -279,11 +285,12 @@ def main():
     # release parent process
     # (daemonize)
     # -----------------------------
-    try:
-        if os.fork():
-            sys.exit(0)	# parent process exits; child continues...
-    except Exception:
-        logging.error("Failed to fork child")
+    if not args.nodaemon:
+        try:
+            if os.fork():
+                sys.exit(0)	# parent process exits; child continues...
+        except Exception:
+            logging.error("Failed to fork child")
 
     # -----------------------------
     # initialize GPU access for the
