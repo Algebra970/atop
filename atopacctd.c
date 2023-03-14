@@ -142,6 +142,8 @@ main(int argc, char *argv[])
 
 	struct sigaction	sigcleanup;
 	int			liResult;
+	// TODO: Add CLI option
+	int 	daemonize = 0;
 
 	/*
 	** argument passed?
@@ -286,23 +288,27 @@ main(int argc, char *argv[])
 	*/
 	parentpid = getpid();		// to be killed when initialized
 	(void) sigaction(SIGTERM, &sigcleanup, (struct sigaction *)0);
+	if ( daemonize )
+	{
+		fprintf(stderr, "Deamonizing...");
+		if ( fork() )			// implicitly switch to background
+	   	{
+			/*
+			** parent after forking first child:
+			** wait for signal 15 from child before terminating
+			** because systemd expects parent to terminate whenever
+			** service is up and running
+			*/
+			pause();		// wait for signal from child
+			fprintf(stderr, "daemon spawned... bye!");
+			exit(0);		// finish parent
+		}
 
-	if ( fork() )			// implicitly switch to background
-   	{
-		/*
- 		** parent after forking first child:
-		** wait for signal 15 from child before terminating
-		** because systemd expects parent to terminate whenever
-		** service is up and running
-		*/
-		pause();		// wait for signal from child
-		exit(0);		// finish parent
+		setsid();			// become session leader to lose ctty
+
+		if ( fork() )			// finish parent; continue in child
+			exit(0);		// --> no session leader, no ctty
 	}
-
-	setsid();			// become session leader to lose ctty
-
-	if ( fork() )			// finish parent; continue in child
-		exit(0);		// --> no session leader, no ctty
 
 	getrlimit(RLIMIT_NOFILE, &rlim);
 
@@ -335,7 +341,7 @@ main(int argc, char *argv[])
 		kill(parentpid, SIGTERM);
 		exit(4);
 	}
-
+	printf("here");
 	/*
 	** create source accounting file to which the kernel can write
 	** its records
@@ -455,7 +461,8 @@ main(int argc, char *argv[])
 	/*
 	** terminate parent: service  initialized
 	*/
-	kill(parentpid, SIGTERM);
+	if ( daemonize )
+		kill(parentpid, SIGTERM);
 
 	/*
 	** main loop
